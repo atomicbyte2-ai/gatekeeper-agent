@@ -1,0 +1,1 @@
+{"dependencies":{"snarkjs":"0.7.5"},"description":"Proof Gatekeeper agent for Agent Games (zkVerify) — deterministic approve/reject with a local Groth16 proof","engines":{"node":">=20"},"name":"gatekeeper-agent","private":true,"scripts":{"start":"node server.mjs","test":"node test-decide.mjs && node test-keccak.mjs"},"type":"module","version":"0.1.0"}
