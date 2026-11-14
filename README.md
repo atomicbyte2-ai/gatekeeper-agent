@@ -62,9 +62,11 @@ submit (the circuit has no `proof_tx` input) and are excluded from the bonus.
   against known vectors). **Unverified against the platform — if practice
   mode rejects proofs, this is the first suspect.**
 - `salt` is unconstrained (0 and random both work); the agent uses a random
-  64-bit salt per proof. `publicSignals[0]` is a salt-derived commitment
-  (exact hash function not yet identified — it does not affect proof
-  validity, which the platform checks cryptographically).
+  64-bit salt per proof. `publicSignals[0]` is a Poseidon commitment
+  `Poseidon([salt, taskId])` — verified against all three measured cases
+  with circomlibjs — which binds the proof to the task. The platform cannot
+  recompute it without the salt (no salt field in the task or response), so
+  it is covered by the Groth16 verification, not a separate platform check.
 
 ## Files
 

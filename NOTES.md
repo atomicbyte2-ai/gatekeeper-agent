@@ -162,8 +162,9 @@ from the wasm binary (scan-hashes.mjs) and brute-forcing names against the
   and reported in the response, not proven by the circuit.
 - There is NO proof_tx input — the reuse check is external (local seen-set),
   which is why PROOF_REUSED tasks have no proof to submit.
-- `salt`: role unclear (probably proof randomisation/binding). Passing 0 and
-  passing a random value both need a witness test — see §6.
+- `salt`: role now IDENTIFIED (see §6) — it feeds a Poseidon commitment
+  over (salt, taskId). Passing 0 and passing a random value both work;
+  the agent uses a random 64-bit salt per proof.
 - `taskId`: conversion from the string task_id (e.g. "gk_24_9d1") to a field
   element is UNKNOWN. Implemented as keccak256(task_id) mod p (most standard
   string→field mapping). **MUST VERIFY IN PRACTICE MODE** — if the platform
@@ -199,12 +200,17 @@ from the wasm binary (scan-hashes.mjs) and brute-forcing names against the
   `[8]` = conditionRecipient; `[9]` = amount; `[10]` = maxTransfer;
   `[11]` = decision; `[12]` = taskId. (Verified: changing only the salt
   changes only `[0]`; changing only proofVkHash changes only `[2]`.)
-- `[0]` (salt commitment): identical across valid/reject/vk-trap cases with
-  the same salt, so it depends on salt but not on decision, VK, or balances.
-  Whether it also depends on taskId: probed with `probe-salt.mjs`
-  (salt=12345 taskId=99 vs salt=1 taskId=24) — [result pending at time of
-  writing; the proof itself verifies regardless, since Groth16 verification
-  covers all 13 signals].
+- `[0]` (salt commitment): **IDENTIFIED — `Poseidon([salt, taskId])`.**
+  Verified with circomlibjs against all three measured cases (salt=12345
+  taskId=24 → 19833346495721727950822528393279092831530130886476995302562363810213804959230;
+  salt=12345 taskId=99 → 9038892341784083490968089187851813286961628059842262325842726835560707255151;
+  salt=1 taskId=24 → 4201711791754924610247101862243779108812798101537470322835392290086746176749).
+  It binds the proof to the (salt, taskId) pair. The platform cannot
+  recompute it without the salt (no salt field in the task envelope or the
+  documented response), so it is covered by the Groth16 verification rather
+  than by a separate platform check. The agent does NOT send the salt in
+  the response (not in the documented format); if practice mode rejects
+  proofs, adding a `salt` field is a troubleshooting step.
 
 ## 7. zkVerify submission (Kurier) — NOT wired yet
 
@@ -245,6 +251,14 @@ from the wasm binary (scan-hashes.mjs) and brute-forcing names against the
   "includeFiles": "gatekeeper.wasm, gatekeeper_final.zkey, verification_key.json" } } }`
   — NO `runtime` field (Vercel rejected `nodejs22.x` on wallet-guard).
 - `package.json`: type module, snarkjs 0.7.5.
+- **End-to-end test (test-server.mjs, 2026-11-15): 17/17 PASS over HTTP on
+  :3001** — preflight 200 + signed, valid task APPROVE/VALID_CONDITION in
+  964 ms with a locally-verifying Groth16 proof + 13 public signals,
+  idempotent retry returns the identical body, threshold trap
+  REJECT/THRESHOLD_MISMATCH with a verifying proof, reused proof_tx
+  REJECT/PROOF_REUSED with NO proof, unsigned 401, bad signature 401,
+  unknown type 400, GET 405. (circomlibjs was installed `--no-save` as a
+  research tool only; it is NOT a runtime dependency.)
 
 ## 9. Deploy + register (NOT done — needs coy)
 
